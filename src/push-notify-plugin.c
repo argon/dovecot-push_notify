@@ -72,11 +72,6 @@ push_notification(struct mail *mail)
 		i_info( "push-notify: push notification enabled" );
 	}
 
-	if ( strcasecmp(mailbox, "INBOX") != 0) {
-		i_info( "push-notify: message saved to mailbox: %s, no notification sent", mailbox );
-		return;
-	}
-
 	notify_sock = socket( AF_UNIX, SOCK_STREAM, 0 );
 	if ( notify_sock < 0 ) {
 		/* warn that connect failed but do not fail the plugin or message will not get delivered */
@@ -102,6 +97,12 @@ push_notification(struct mail *mail)
 		i_strocpy( msg_data.d1, user->username, sizeof(msg_data.d1) );
 		if (debug)
 			i_info( "push-notify: notify: %s", msg_data.d1 );
+	}
+
+	if ( mailbox != NULL ) {
+		i_strocpy( msg_data.d2, mailbox, sizeof(msg_data.d2) );
+		if (debug)
+			i_info( "push-notify: mailbox: %s", msg_data.d2);
 	}
 
 	rc = send(notify_sock, (void *)&msg_data, sizeof(struct msg_data_s), 0);

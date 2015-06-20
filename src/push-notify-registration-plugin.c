@@ -61,19 +61,9 @@ static imap_client_created_func_t *next_hook_client_created;
 	  "aps-subtopic" "com.apple.mobilemail"
 */
 
-static void do_notify(const char *username, const char *aps_acct_id,
-		      const char *aps_dev_token, const char *aps_sub_topic)
+static void send_msg_data(msg_data_t *msg_data)
 {
 	const char *push_notify_path = PUSH_NOTIFY_PATH;
-
-	msg_data_t msg_data;
-	memset(&msg_data, 0, sizeof(struct msg_data_s));
-	msg_data.msg = 2;
-
-	i_strocpy(msg_data.d1, username, sizeof(msg_data.d1));
-	i_strocpy(msg_data.d2, aps_acct_id, sizeof(msg_data.d2));
-	i_strocpy(msg_data.d3, aps_dev_token, sizeof(msg_data.d3));
-	i_strocpy(msg_data.d4, aps_sub_topic, sizeof(msg_data.d4));
 
 	int soc = socket( AF_UNIX, SOCK_STREAM, 0 );
 	if ( soc < 0 ) {
@@ -94,7 +84,7 @@ static void do_notify(const char *username, const char *aps_acct_id,
 		return;
 	}
 
-	rc = send(soc, (void *)&msg_data, sizeof(msg_data), 0);
+	rc = send(soc, msg_data, sizeof(*msg_data), 0);
 	if ( rc < 0 )
 		i_warning("send to notify socket %s failed: %m",
 			  push_notify_path);
@@ -102,53 +92,8 @@ static void do_notify(const char *username, const char *aps_acct_id,
 	close(soc);
 }
 
-static const char *aps_reply_generate (const char *aps_topic, const char *username,
-				       const struct imap_arg *args)
-{
-	const char *aps_ver=NULL;
-	const char *aps_acct_id=NULL;
-	const char *aps_dev_token=NULL;
-	const char *aps_sub_topic=NULL;
-	const char *key, *value;
-
-	/* must have a topic */
-	if (aps_topic == NULL || *aps_topic == '\0')
-		return NULL;
-
-	/* scarf off the aps keys/values */
-	while (imap_arg_get_astring(&args[0], &key) &&
-	       imap_arg_get_astring(&args[1], &value)) {
-		if (strcasecmp(key, "aps-version") == 0)
-			aps_ver = t_strdup(value);
-		else if (strcasecmp(key, "aps-account-id") == 0)
-			aps_acct_id = t_strdup(value);
-		else if (strcasecmp(key, "aps-device-token") == 0)
-			aps_dev_token = t_strdup(value);
-		else if (strcasecmp(key, "aps-subtopic") == 0)
-			aps_sub_topic = t_strdup(value);
-		else 
-			return NULL;
-		args += 2;
-	}
-
-	/* save notification settings */
-	if ( aps_ver && aps_acct_id && aps_dev_token && aps_sub_topic ) {
-		/* subscribe to notification node */
-		do_notify(username, aps_acct_id,
-			  aps_dev_token, aps_sub_topic);
-
-		/* generate aps response */
-		string_t *str = t_str_new(256);
-		imap_append_quoted( str, "aps-version" );
-		str_append_c(str, ' ');
-		imap_append_quoted( str, APS_VERSION );
-		str_append_c(str, ' ');
-		imap_append_quoted( str, "aps-topic" );
-		str_append_c(str, ' ');
-		imap_append_quoted( str, aps_topic );
-		return str_c(str);
-	}
-	return NULL;
+void send_response(struct client *client, string_t *reply) {
+	client_send_line(client, t_strdup_printf("* XAPPLEPUSHSERVICE %s", str_c(reply)));
 }
 
 static bool cmd_x_apple_push_service(struct client_command_context *cmd)
@@ -161,13 +106,86 @@ static bool cmd_x_apple_push_service(struct client_command_context *cmd)
 	if (!client_read_args(cmd, 0, 0, &args))
 		return FALSE;
 
-	const char *reply = aps_reply_generate(aps_topic, user->username, args);
-	if (reply != NULL) {
-		client_send_line(cmd->client,
-				 t_strdup_printf("* XAPPLEPUSHSERVICE %s",
-						 reply));
+	const char *aps_ver=NULL;
+	const char *aps_acct_id=NULL;
+	const char *aps_dev_token=NULL;
+	const char *aps_sub_topic=NULL;
+	const struct imap_arg *mailbox_list=NULL;
+	unsigned int mailbox_count=NULL;
+	bool mailbox_subscriptions=FALSE;
+
+	const char *key, *value;
+
+	/* must have a topic */
+	if (aps_topic == NULL || *aps_topic == '\0')
+		return NULL;
+
+	/* scarf off the aps keys/values */
+	while (imap_arg_get_astring(&args[0], &key)) {
+		if (imap_arg_get_astring(&args[1], &value)) {
+			if (strcasecmp(key, "aps-version") == 0)
+				aps_ver = t_strdup(value);
+			else if (strcasecmp(key, "aps-account-id") == 0)
+				aps_acct_id = t_strdup(value);
+			else if (strcasecmp(key, "aps-device-token") == 0)
+				aps_dev_token = t_strdup(value);
+			else if (strcasecmp(key, "aps-subtopic") == 0)
+				aps_sub_topic = t_strdup(value);
+			else 
+				return NULL;
+		}
+		else if (strcasecmp(key, "mailboxes") == 0) {
+			mailbox_subscriptions = imap_arg_get_list_full(&args[1], &mailbox_list, &mailbox_count);
+		}
+		args += 2;
 	}
-	client_send_tagline(cmd, "OK XAPPLEPUSHSERVICE completed.");
+
+	/* save notification settings */
+	if ( aps_ver && aps_acct_id && aps_dev_token && aps_sub_topic ) {
+		msg_data_t msg_data;
+		
+		/* subscribe to notification node */
+		memset(&msg_data, 0, sizeof(struct msg_data_s));
+		msg_data.msg = 2;
+		i_strocpy(msg_data.d1, user->username, sizeof(msg_data.d1));
+		i_strocpy(msg_data.d2, aps_acct_id, sizeof(msg_data.d2));
+		i_strocpy(msg_data.d3, aps_dev_token, sizeof(msg_data.d3));
+		i_strocpy(msg_data.d4, aps_sub_topic, sizeof(msg_data.d4));
+		send_msg_data(&msg_data);
+
+		if(mailbox_subscriptions) {
+			const char *mailbox;
+			while (imap_arg_get_astring(&mailbox_list[0], &mailbox)) {
+				string_t *mailbox_str = t_str_new(256);
+				imap_append_quoted( mailbox_str, "mailbox");
+				str_append_c( mailbox_str, ' ');
+				imap_append_quoted( mailbox_str, mailbox);
+				send_response(cmd->client, mailbox_str);
+
+				msg_data.msg = 4;
+				i_strocpy(msg_data.d1, user->username, sizeof(msg_data.d1));
+				i_strocpy(msg_data.d2, aps_acct_id, sizeof(msg_data.d2));
+				i_strocpy(msg_data.d3, aps_dev_token, sizeof(msg_data.d3));
+				i_strocpy(msg_data.d4, mailbox, sizeof(msg_data.d4));
+				send_msg_data(&msg_data);
+
+				mailbox_list += 1;
+			}
+		}
+
+		/* generate aps response */
+		string_t *str = t_str_new(256);
+		imap_append_quoted( str, "aps-version" );
+		str_append_c(str, ' ');
+		imap_append_quoted( str, APS_VERSION );
+		str_append_c(str, ' ');
+		imap_append_quoted( str, "aps-topic" );
+		str_append_c(str, ' ');
+		imap_append_quoted( str, aps_topic );
+		send_response(cmd->client, str);
+	}
+
+	client_send_tagline(cmd, "OK Provisioned");
 
 	return TRUE;
 }

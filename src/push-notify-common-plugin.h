@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define APS_VERSION "1"
+#define APS_VERSION "2"
 
 #define PUSH_NOTIFY_PATH "/var/dovecot/push_notify"
 
