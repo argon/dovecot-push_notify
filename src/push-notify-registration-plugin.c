@@ -156,6 +156,7 @@ static bool cmd_x_apple_push_service(struct client_command_context *cmd)
 		if(mailbox_subscriptions) {
 			const char *mailbox;
 			while (imap_arg_get_astring(&mailbox_list[0], &mailbox)) {
+				T_BEGIN;
 				string_t *mailbox_str = t_str_new(256);
 				imap_append_quoted( mailbox_str, "mailbox");
 				str_append_c( mailbox_str, ' ');
@@ -165,7 +166,7 @@ static bool cmd_x_apple_push_service(struct client_command_context *cmd)
 				msg_data.msg = 4;
 				i_strocpy(msg_data.d4, mailbox, sizeof(msg_data.d4));
 				send_msg_data(&msg_data);
-
+				T_END;
 				mailbox_list += 1;
 			}
 		}
