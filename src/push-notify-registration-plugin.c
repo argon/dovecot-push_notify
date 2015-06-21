@@ -163,9 +163,6 @@ static bool cmd_x_apple_push_service(struct client_command_context *cmd)
 				send_response(cmd->client, mailbox_str);
 
 				msg_data.msg = 4;
-				i_strocpy(msg_data.d1, user->username, sizeof(msg_data.d1));
-				i_strocpy(msg_data.d2, aps_acct_id, sizeof(msg_data.d2));
-				i_strocpy(msg_data.d3, aps_dev_token, sizeof(msg_data.d3));
 				i_strocpy(msg_data.d4, mailbox, sizeof(msg_data.d4));
 				send_msg_data(&msg_data);
 
