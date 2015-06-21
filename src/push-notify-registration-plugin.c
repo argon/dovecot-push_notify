@@ -118,7 +118,7 @@ static bool cmd_x_apple_push_service(struct client_command_context *cmd)
 
 	/* must have a topic */
 	if (aps_topic == NULL || *aps_topic == '\0')
-		return NULL;
+		return FALSE;
 
 	/* scarf off the aps keys/values */
 	while (imap_arg_get_astring(&args[0], &key)) {
@@ -132,7 +132,7 @@ static bool cmd_x_apple_push_service(struct client_command_context *cmd)
 			else if (strcasecmp(key, "aps-subtopic") == 0)
 				aps_sub_topic = t_strdup(value);
 			else 
-				return NULL;
+				return FALSE;
 		}
 		else if (strcasecmp(key, "mailboxes") == 0) {
 			mailbox_subscriptions = imap_arg_get_list_full(&args[1], &mailbox_list, &mailbox_count);
