@@ -122,6 +122,7 @@ static void push_notify_mail_save(void *txn, struct mail *mail)
 
 static void push_notify_mail_copy(void *txn, struct mail *src, struct mail *dst)
 {
+	push_notification(src);
 	push_notification(dst);
 }
 
