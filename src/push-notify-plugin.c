@@ -55,13 +55,13 @@
 static void
 push_notification(struct mail *mail)
 {
-	int					debug			= 0;
-	int					notify_sock		= 0;
-	const char		   *sock_path		= PUSH_NOTIFY_PATH;
-	ssize_t				rc				= 0;
-	socklen_t			sock_len		= 0;
-	struct sockaddr_un	sock_addr;
-	struct msg_data_s	msg_data;
+	int	                debug           = 0;
+	int	                notify_sock     = 0;
+	const char         *sock_path       = PUSH_NOTIFY_PATH;
+	ssize_t             rc              = 0;
+	socklen_t           sock_len        = 0;
+	struct sockaddr_un  sock_addr;
+	struct msg_data_s   msg_data;
 
 	const char *mailbox = mailbox_get_vname(mail->box);
 	struct mail_storage *storage = mailbox_get_storage(mail->box);
