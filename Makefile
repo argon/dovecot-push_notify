@@ -5,18 +5,16 @@
 # Dovecot's header directory
 DOVECOT_INC_PATH = /usr/include/dovecot
 # Dovecot's plugin path
-DOVECOT_PLUGIN_PATH = /usr/lib/dovecot/modules
+DOVECOT_PLUGIN_PATH = /usr/lib64/dovecot
 # Dovecot's config path
 DOVECOT_CONFIG_PATH = /etc/dovecot/conf.d 
+# D
 
 ## usually no need to configure anything below this line ##
 
 # plugin source & target name #
-NOTIFY_PLUGIN_NAME = lib_push_notify_plugin.so
-REGISTRATION_PLUGIN_NAME = lib_push_notify_registration_plugin.so
-
-# config file
-PLUGIN_CONFIG_FILE = 95-push_notify_plugin.conf
+NOTIFY_PLUGIN_NAME = lib90_push_notify_plugin.so
+REGISTRATION_PLUGIN_NAME = lib90_push_notify_registration_plugin.so
 
 #### configuration end ####
 
@@ -63,16 +61,12 @@ ${REGISTRATION_PLUGIN_NAME}: ${REGISTRATION_SOURCE}
 install: install_notify_plugin install_registration_plugin
 
 install_notify_plugin: ${NOTIFY_PLUGIN_NAME}
-	install -d ${DESTDIR}/${DOVECOT_PLUGIN_PATH}
-	install $< ${DESTDIR}/${DOVECOT_PLUGIN_PATH}
+	install -d ${DESTDIR}${DOVECOT_PLUGIN_PATH}
+	install -m 0755 $< ${DESTDIR}${DOVECOT_PLUGIN_PATH}
 
 install_registration_plugin: ${REGISTRATION_PLUGIN_NAME}
-	install -d ${DESTDIR}/${DOVECOT_PLUGIN_PATH}
-	install $< ${DESTDIR}/${DOVECOT_PLUGIN_PATH}
-
-configure:
-	install -d ${DESTDIR}/${DOVECOT_CONFIG_PATH}
-	install -m 644 ${PLUGIN_CONFIG_FILE} ${DESTDIR}/${DOVECOT_CONFIG_PATH}
+	install -d ${DESTDIR}${DOVECOT_PLUGIN_PATH}
+	install -m 0755 $< ${DESTDIR}${DOVECOT_PLUGIN_PATH}
 
 clean:
 	$(RM) ${NOTIFY_PLUGIN_NAME} ${REGISTRATION_PLUGIN_NAME}
